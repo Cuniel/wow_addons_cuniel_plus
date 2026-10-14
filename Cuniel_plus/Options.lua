@@ -13,7 +13,7 @@ function NS:CreateOptions()
     panel:RegisterForDrag("LeftButton")
     panel:SetScript("OnDragStart", panel.StartMoving)
     panel:SetScript("OnDragStop", panel.StopMovingOrSizing)
-    panel.TitleText:SetText("Cuniel_plus  |  0.3.10")
+    panel.TitleText:SetText("Cuniel_plus  |  0.3.11")
     tinsert(UISpecialFrames, "CunielPlusOptions")
 
     local function Label(text, x, y, template)

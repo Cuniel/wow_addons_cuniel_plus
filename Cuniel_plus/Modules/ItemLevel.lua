@@ -1,7 +1,10 @@
 local _, NS = ...
 local Module = {cache = {}, attempted = {}, lastRequest = -10}
 NS:RegisterModule("itemLevel", Module)
-local function Safe(v) return not issecretvalue or not issecretvalue(v) end
+local function Safe(v)
+    if issecretvalue and issecretvalue(v) then return false end
+    return not canaccessvalue or canaccessvalue(v)
+end
 function Module:UsesShestak()
     local config = ShestakUI and ShestakUI[2]
     local tooltip = config and config.tooltip
@@ -21,7 +24,8 @@ local function CurrentUnit()
 end
 function Module:ResetHover()
     self.hoverGUID, self.requested = nil, false
-    if self.footer then self.footer:Hide() end
+    if self.line then self.line:SetText("") end
+    self.line, self.lineText, self.lineGUID, self.layoutGUID = nil, nil, nil, nil
 end
 function Module:Apply() self:ResetHover() end
 
@@ -56,10 +60,39 @@ function Module:Display(guid, value)
     if not NS.db.itemLevel.enabled or self:UsesShestak() or not Number(value) or self.hoverGUID ~= guid then return end
     local unit = CurrentUnit()
     if not unit or Guid(unit) ~= guid then return end
-    -- A separate footer never rebuilds GameTooltip or triggers its OnShow hooks.
-    local text = string.format("装等  %.1f", value)
-    if self.lastText ~= text then self.label:SetText(text); self.lastText = text end
-    if not self.footer:IsShown() then self.footer:Show() end
+    if self.rendering then return end
+    local color = "|cffffffff"
+    local _, ownLevel = GetAverageItemLevel()
+    if Number(ownLevel) then
+        local diff = ownLevel - value
+        if diff >= 10 then color = "|cffff1919"
+        elseif diff >= 5 then color = "|cffff7f3f"
+        elseif diff >= -5 then color = "|cffffff00"
+        elseif diff >= -10 then color = "|cff3fbf3f"
+        else color = "|cffb2b2b2" end
+    end
+    local text = "|cffF9D700" .. (STAT_AVERAGE_ITEM_LEVEL or "物品等级")
+        .. ": |r" .. color .. string.format("%.1f", value) .. "|r"
+    -- Retain the exact FontString for this tooltip generation. Never search
+    -- GetText() for hidden markers: the client can return restricted text.
+    if self.lineGUID == guid then
+        if self.line and self.lineText ~= text then self.line:SetText(text); self.lineText = text end
+        return
+    end
+    self.rendering = true
+    self.lineText, self.lineGUID = text, guid
+    GameTooltip:AddLine(text)
+    local count = GameTooltip:NumLines()
+    if Safe(count) and type(count) == "number" then
+        self.line = _G["GameTooltipTextLeft" .. count]
+    end
+    -- Resize once per hover, with a guard against callbacks re-entering Tick.
+    -- Natural tooltip rebuilds perform their own layout and clear our row.
+    if self.layoutGUID ~= guid then
+        self.layoutGUID = guid
+        GameTooltip:Show()
+    end
+    self.rendering = false
 end
 function Module:Tick()
     if not NS.db.itemLevel.enabled or self:UsesShestak() or InCombatLockdown() then self:ResetHover(); return end
@@ -74,11 +107,9 @@ function Module:Tick()
     local isSelf = UnitIsUnit(unit, "player")
     if not Safe(isSelf) then return end
     if isSelf then
-        if not self.requested then
-            self.requested = true
-            local _, equipped = GetAverageItemLevel()
-            self:Display(guid, equipped)
-        end
+        self.requested = true
+        local _, equipped = GetAverageItemLevel()
+        self:Display(guid, equipped)
         return
     end
     local cached = self.cache[guid]
@@ -92,19 +123,10 @@ function Module:Tick()
     NotifyInspect(unit)
 end
 function Module:Initialize()
-    local footer = CreateFrame("Frame", "CunielPlusItemLevel", GameTooltip, "BackdropTemplate")
-    self.footer = footer
-    footer:SetPoint("TOPLEFT", GameTooltip, "BOTTOMLEFT", 0, -1)
-    footer:SetPoint("TOPRIGHT", GameTooltip, "BOTTOMRIGHT", 0, -1)
-    footer:SetHeight(23)
-    footer:SetBackdrop({bgFile = "Interface\\Buttons\\WHITE8X8"})
-    footer:SetBackdropColor(0.03, 0.03, 0.03, 0.95)
-    footer:EnableMouse(false)
-    self.label = footer:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    self.label:SetPoint("LEFT", 9, 0)
-    self.label:SetTextColor(1, 0.82, 0)
-    footer:Hide()
     GameTooltip:HookScript("OnHide", function() Module:ResetHover() end)
+    GameTooltip:HookScript("OnTooltipCleared", function()
+        Module.line, Module.lineText, Module.lineGUID = nil, nil, nil
+    end)
     local frame, elapsed = CreateFrame("Frame"), 0
     frame:RegisterEvent("INSPECT_READY")
     frame:SetScript("OnEvent", function(_, _, guid)
