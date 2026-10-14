@@ -1,0 +1,23 @@
+## Interface: 120100, 120105
+## Title: Cuniel_plus
+## Notes: Modular UI enhancements: ShestakUI numbers and movable FPS.
+## Notes-zhCN: 模块化界面增强：数字格式切换、可移动帧数显示。
+## Author: Cuniel
+## Version: 0.3.9
+## OptionalDeps: ShestakUI, BagBrother, Bagnon
+## SavedVariables: CunielPlusDB
+
+Core.lua
+Modules\Numbers.lua
+Modules\FPS.lua
+Modules\GoldColors.lua
+Modules\ItemLevel.lua
+Modules\Sorting.lua
+Modules\Deposit.lua
+Modules\ShestakBags.lua
+Modules\SlotLabels.lua
+Modules\MapEscape.lua
+Modules\Bagnon.lua
+Modules\Quiet.lua
+Modules\ArenaSpam.lua
+Options.lua

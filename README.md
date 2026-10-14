@@ -18,3 +18,7 @@
 ## 验证与打包
 
 安装 Python 及 `lupa` 后，运行 `python tests/test_slotlabels.py`、`python tests/test_windows.py`。运行 `python tools/package.py` 生成安装包。每次修改应先验证、再提交，保留可回退的版本历史。
+
+## 自动发布
+
+提交到 `main` 后，GitHub Actions 会先测试，再按 TOC 中的版本号打包并创建 Release。安装包可从仓库 Releases 下载。发布新版本时需递增 `Cuniel_plus/Cuniel_plus.toc` 的版本号；已有版本不会被覆盖。

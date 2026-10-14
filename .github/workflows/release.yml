@@ -1,0 +1,52 @@
+name: Package and release
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'Cuniel_plus/**'
+      - 'tests/**'
+      - 'tools/package.py'
+      - '.github/workflows/release.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: release-main
+  cancel-in-progress: false
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install test dependencies
+        run: pip install -r requirements-dev.txt
+      - name: Validate Lua and behavior
+        run: |
+          python tests/test_windows.py
+          python tests/test_slotlabels.py
+      - name: Read addon version
+        id: version
+        run: |
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          version = next(line.split(':', 1)[1].strip() for line in Path('Cuniel_plus/Cuniel_plus.toc').read_text().splitlines() if line.startswith('## Version:'))
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write('value=' + version + '\n')
+          PY
+      - name: Build addon ZIP
+        run: python tools/package.py
+      - name: Publish version release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.value }}
+        run: |
+          tag="v$VERSION"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "Release $tag already exists; bump the TOC version for a new release."
+          else
+            gh release create "$tag" "dist/Cuniel_plus-$VERSION.zip" --target "$GITHUB_SHA" --title "Cuniel_plus $VERSION" --generate-notes
+          fi
