@@ -24,6 +24,34 @@ function Module:ResetHover()
     if self.footer then self.footer:Hide() end
 end
 function Module:Apply() self:ResetHover() end
+
+function Module:RepairShestak()
+    if InCombatLockdown() then
+        NS:Print("请脱离战斗后再修复装等提示。")
+        return false
+    end
+    local config = ShestakUI and ShestakUI[2]
+    local profile = config and config.options
+    -- C.options must be the actual SavedVariables profile, not the temporary
+    -- empty table Shestak creates when its configuration addon is unavailable.
+    local persisted = false
+    for _, profiles in ipairs({ShestakUIOptions or {}, ShestakUIOptionsPerChar or {}}) do
+        for _, candidate in pairs(profiles) do
+            if candidate == profile then persisted = true end
+        end
+    end
+    if type(profile) ~= "table" or not persisted then
+        NS:Print("请启用 ShestakUI_Config 并重载，再点击修复装等提示。")
+        return false
+    end
+    if type(profile.tooltip) ~= "table" then profile.tooltip = {} end
+    profile.tooltip.average_lvl = false
+    NS.db.itemLevel.enabled = true
+    -- Keep the running Shestak configuration intact until reload. Its private
+    -- OnUpdate was installed at file load and cannot be safely removed here.
+    ReloadUI()
+    return true
+end
 function Module:Display(guid, value)
     if not NS.db.itemLevel.enabled or self:UsesShestak() or not Number(value) or self.hoverGUID ~= guid then return end
     local unit = CurrentUnit()

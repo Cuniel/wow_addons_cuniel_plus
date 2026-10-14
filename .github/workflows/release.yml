@@ -27,6 +27,7 @@ jobs:
         run: |
           python tests/test_windows.py
           python tests/test_slotlabels.py
+          python tests/test_itemlevel_repair.py
       - name: Read addon version
         id: version
         run: |
