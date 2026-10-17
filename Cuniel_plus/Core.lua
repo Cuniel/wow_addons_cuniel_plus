@@ -14,6 +14,7 @@ NS.defaults = {
     bagPosition = {enabled = true, x = -55, y = 40},
     slotLabels = {enabled = true, size = 11},
     mapEscape = {enabled = true},
+    itemCounts = {enabled = true, characters = {}, account = {}},
 }
 
 local function FillDefaults(target, defaults)

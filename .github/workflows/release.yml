@@ -29,6 +29,7 @@ jobs:
           python tests/test_slotlabels.py
           python tests/test_itemlevel_repair.py
           python tests/test_itemlevel_display.py
+          python tests/test_itemcounts.py
       - name: Read addon version
         id: version
         run: |
