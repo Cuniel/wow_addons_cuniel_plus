@@ -12,7 +12,9 @@ NS.defaults = {
     quiet = {enabled = true},
     arenaSpam = {enabled = true},
     bagPosition = {enabled = true, x = -55, y = 40},
-    slotLabels = {enabled = true, size = 11},
+    slotLabels = {enabled = true, size = 11, qualities = {
+        [0] = false, [1] = false, [2] = false, [3] = true, [4] = true,
+        [5] = true, [6] = true, [7] = true, [8] = true}},
     mapEscape = {enabled = true},
     itemCounts = {enabled = true, characters = {}, account = {},
         filters = {hearth = true, equipped = true, junk = true, quests = false, excludeIDs = {}}},

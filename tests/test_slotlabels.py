@@ -41,7 +41,9 @@ Stuffing={SlotUpdate=function(self,entry) self.lastUpdated=entry end,buttons={
  {frame=food,bag=0,slot=3},{frame=secret,bag=0,slot=4},
 }}
 local links={[1]='fingerLink',[2]='feetLink',[3]='foodLink',[4]='SECRET'}
-C_Container={GetContainerItemLink=function(_,slot) return links[slot] end}
+quality=3
+C_Container={GetContainerItemLink=function(_,slot) return links[slot] end,
+ GetContainerItemInfo=function() return {quality=quality} end}
 C_Item={GetItemInfoInstant=function(link)
  if link=='fingerLink' then return 1,'Armor','Misc','INVTYPE_FINGER' end
  if link=='feetLink' then return 2,'Armor','Cloth','INVTYPE_FEET' end
@@ -82,6 +84,21 @@ NS.db.slotLabels.enabled=true;module:Apply()
 assert(finger.label.visible and finger.label.text=='手指','re-enable failed')
 NS.db.slotLabels.size=17;module:Apply()
 assert(finger.label.size==17 and feet.label.size==17,'font size did not refresh existing labels')
+for q=0,8 do
+ quality=q;module:Apply()
+ assert(finger.label.visible==(q>=3),'blue-and-above default filter failed for quality '..q)
+end
+NS.db.slotLabels.qualities={}
+for q=0,8 do
+ quality=q;NS.db.slotLabels.qualities[q]=true;module:Apply()
+ assert(finger.label.visible,'individual quality enable failed')
+ NS.db.slotLabels.qualities[q]=false;module:Apply()
+ assert(not finger.label.visible,'individual quality disable failed')
+end
+quality='SECRET';module:Apply();assert(not finger.label.visible,'restricted quality shown')
+quality=nil;module:Apply();assert(not finger.label.visible,'unknown quality guessed')
+quality=3;NS.db.slotLabels.qualities[3]=true;module:Apply()
+assert(finger.label.visible,'quality recovery failed')
 ''')
 print('PASS: stable adjustable slot labels, secret-value guard, no hover/click hooks, and reversible toggle')
 

@@ -101,6 +101,24 @@ local function ReadSlotName(bag, slot)
     if not ok or not IsReadable(link) then return end
     if link == nil then return end
 
+    local quality
+    if C_Container.GetContainerItemInfo then
+        local infoOK, info = pcall(C_Container.GetContainerItemInfo, bag, slot)
+        if not infoOK or not IsReadable(info) then return end
+        if type(info) == "table" then quality = info.quality end
+    end
+    if not IsReadable(quality) then return end
+    if quality == nil and C_Item and C_Item.GetItemInfo then
+        local result = {pcall(C_Item.GetItemInfo, link)}
+        if result[1] then quality = result[4] end
+    end
+    -- Unknown/restricted quality is never guessed; bag/data events retry it.
+    if not IsReadable(quality) or type(quality) ~= "number" then return end
+    local qualities = NS.db.slotLabels.qualities
+    local allowed = qualities and qualities[quality]
+    if allowed == nil then allowed = quality >= 3 and quality <= 8 end
+    if not allowed then return end
+
     -- The global function is the primary API used by this ShestakUI/GearView
     -- generation.  C_Item is retained as a fallback for later clients.
     local getter = type(GetItemInfoInstant) == "function" and GetItemInfoInstant
@@ -162,6 +180,7 @@ function Module:Initialize()
     for _, event in ipairs({
         "PLAYER_LOGIN", "BAG_UPDATE_DELAYED", "BANKFRAME_OPENED",
         "PLAYERBANKSLOTS_CHANGED", "PLAYER_REGEN_ENABLED",
+        "GET_ITEM_INFO_RECEIVED",
     }) do
         events:RegisterEvent(event)
     end
@@ -177,6 +196,45 @@ function Module:Initialize()
             Module:UpdateEntry(entry)
         end)
     end
+end
+
+function Module:OpenQualityOptions()
+    if self.qualityPanel then self.qualityPanel:Show(); return end
+    local panel = CreateFrame("Frame", "CunielPlusSlotQualityOptions", UIParent, "BasicFrameTemplateWithInset")
+    self.qualityPanel = panel
+    panel:SetSize(440, 435)
+    panel:SetPoint("CENTER")
+    panel:SetFrameStrata("FULLSCREEN_DIALOG")
+    panel.TitleText:SetText("装备部位 · 按品质显示")
+    table.insert(UISpecialFrames, "CunielPlusSlotQualityOptions")
+    local items = {
+        {"粗糙（灰色）", "9d9d9d"}, {"普通（白色）", "ffffff"},
+        {"优秀（绿色）", "1eff00"}, {"精良（蓝色）", "0070dd"},
+        {"史诗（紫色）", "a335ee"}, {"传说（橙色）", "ff8000"},
+        {"神器（金色）", "e6cc80"}, {"传家宝（浅蓝色）", "00ccff"},
+        {"时光徽章（特殊品质）", "00ccff"},
+    }
+    local checks = {}
+    for i, item in ipairs(items) do
+        local quality = i - 1
+        local check = CreateFrame("CheckButton", nil, panel, "UICheckButtonTemplate")
+        checks[quality] = check
+        check:SetPoint("TOPLEFT", 20, -35 - (i - 1) * 35)
+        local text = check:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+        text:SetPoint("LEFT", check, "RIGHT", 0, 0)
+        text:SetText("|cff" .. item[2] .. item[1] .. "|r")
+        check:SetScript("OnClick", function(self)
+            NS.db.slotLabels.qualities[quality] = self:GetChecked() and true or false
+            Module:Apply()
+        end)
+    end
+    local note = panel:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    note:SetPoint("TOPLEFT", 24, -365)
+    note:SetText("默认仅蓝色及以上；仅可穿戴装备显示部位。\n时光徽章等非装备即使勾选也不会显示部位。\n账号共用，修改即时生效。")
+    panel:SetScript("OnShow", function()
+        for quality, check in pairs(checks) do check:SetChecked(NS.db.slotLabels.qualities[quality]) end
+    end)
+    panel:Hide(); panel:Show()
 end
 
 function Module:Apply()

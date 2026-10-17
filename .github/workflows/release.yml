@@ -5,7 +5,10 @@ on:
     paths:
       - 'Cuniel_plus/**'
       - 'tests/**'
-      - 'tools/package.py'
+      - 'tools/**'
+      - 'release-notes/**'
+      - 'README.md'
+      - 'CHANGELOG.md'
       - '.github/workflows/release.yml'
   workflow_dispatch:
 permissions:
@@ -31,6 +34,8 @@ jobs:
           python tests/test_itemlevel_display.py
           python tests/test_itemcounts.py
           python tests/test_itemcount_filters.py
+          python tests/test_release_notes.py
+          python tools/release_notes.py
       - name: Read addon version
         id: version
         run: |
@@ -50,7 +55,11 @@ jobs:
         run: |
           tag="v$VERSION"
           if gh release view "$tag" >/dev/null 2>&1; then
-            echo "Release $tag already exists; bump the TOC version for a new release."
+            gh release edit "$tag" --notes-file "release-notes/$tag.md"
           else
-            gh release create "$tag" "dist/Cuniel_plus-$VERSION.zip" --target "$GITHUB_SHA" --title "Cuniel_plus $VERSION" --generate-notes
+            gh release create "$tag" "dist/Cuniel_plus-$VERSION.zip" --target "$GITHUB_SHA" --title "Cuniel_plus $VERSION" --notes-file "release-notes/$tag.md"
           fi
+      - name: Backfill authored notes for historical releases
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python tools/release_notes.py --backfill
