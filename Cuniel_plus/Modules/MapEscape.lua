@@ -7,6 +7,19 @@ local FRAME_NAMES = {
     "WorldMapFrame",
     -- Character, reputation and currency are tabs of this same top-level frame.
     "CharacterFrame",
+    -- Explicit top-level browsing windows only. Do not include transaction
+    -- windows (bank, trade, merchant), popups, or nested talent editors.
+    "PlayerSpellsFrame", -- Specializations, talents and spellbook
+    "ProfessionsBookFrame",
+    "ProfessionsFrame",
+    "CollectionsJournal",
+    "EncounterJournal",
+    "AchievementFrame",
+    "InspectFrame",
+    "PVEFrame",
+    "FriendsFrame",
+    "CommunitiesFrame",
+    "MacroFrame",
 }
 
 local function FindFrame(frameName)
@@ -31,10 +44,11 @@ function Module:Initialize()
     local events = CreateFrame("Frame")
     events:RegisterEvent("PLAYER_LOGIN")
     events:RegisterEvent("ADDON_LOADED")
-    events:SetScript("OnEvent", function(_, event, addon)
-        if event == "PLAYER_LOGIN" or addon == "Blizzard_WorldMap" or addon == "Blizzard_CharacterUI" then
-            Module:EnsureRegistered()
-        end
+    events:RegisterEvent("PLAYER_ENTERING_WORLD")
+    events:SetScript("OnEvent", function()
+        -- Panels are created by several load-on-demand addons. Scan only the
+        -- bounded list after loads instead of assuming a particular addon name.
+        Module:EnsureRegistered()
     end)
     self.events = events
 end
