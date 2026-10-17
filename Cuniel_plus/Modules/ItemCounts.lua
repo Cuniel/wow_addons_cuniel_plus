@@ -124,7 +124,8 @@ end
 function Module:Rows(id)
     local rows, total = {}, 0
     for key, record in pairs(NS.db.itemCounts.characters) do
-        local count = SumTabs(record.bags, id) + SumTabs(record.bank, id) + Value(record.equipment, id)
+        local count = SumTabs(record.bags, id) + SumTabs(record.bank, id)
+        if not NS.ItemCountFilters:Get().equipped then count = count + Value(record.equipment, id) end
         if count > 0 then
             rows[#rows + 1] = {name = record.name, realm = record.realm, class = record.class, count = count, current = key == self.currentKey}
             total = total + count
@@ -144,6 +145,7 @@ function Module:Tooltip(tooltip, data)
     if not Safe(data) or type(data) ~= "table" then return end
     local id = data.id
     if not Numeric(id) or id <= 0 or self.seen[tooltip] == id then return end
+    if NS.ItemCountFilters:Excluded(id) then return end
     local rows, account, total = self:Rows(id)
     if total <= 0 then return end
     -- Set before adding lines to guard callbacks. Never Show/rebuild the

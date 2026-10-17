@@ -3,7 +3,7 @@
 ## Notes: Modular UI enhancements: ShestakUI numbers and movable FPS.
 ## Notes-zhCN: 模块化界面增强：数字格式切换、可移动帧数显示。
 ## Author: Cuniel
-## Version: 0.3.14
+## Version: 0.3.15
 ## OptionalDeps: ShestakUI, BagBrother, Bagnon
 ## SavedVariables: CunielPlusDB
 
@@ -12,6 +12,7 @@ Modules\Numbers.lua
 Modules\FPS.lua
 Modules\GoldColors.lua
 Modules\ItemLevel.lua
+Modules\ItemCountFilters.lua
 Modules\ItemCounts.lua
 Modules\Sorting.lua
 Modules\Deposit.lua

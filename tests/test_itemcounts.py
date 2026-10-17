@@ -3,7 +3,7 @@ from lupa.lua51 import LuaRuntime
 
 lua=LuaRuntime(unpack_returned_tuples=True)
 lua.execute('''
-NS={db={itemCounts={enabled=true,characters={},account={}}},modules={},RegisterModule=function(self,k,m) self.modules[k]=m end}
+NS={db={itemCounts={enabled=true,characters={},account={},filters={equipped=false}}},modules={},RegisterModule=function(self,k,m) self.modules[k]=m end}
 Enum={BagIndex={ReagentBag=5},BankType={Character=0,Account=2},TooltipDataType={Item=0}}
 function GetRealmName() return 'Realm' end
 function UnitName() return 'Current' end
@@ -31,7 +31,9 @@ TooltipDataProcessor={AddTooltipPostCall=function(_,f) callback=f end}
 function CreateFrame() return {RegisterEvent=function() end,SetScript=function(self,k,f) self[k]=f end} end
 C_Timer={After=function(_,f) f() end}
 ''')
-lua.eval('function(s,ns) assert(loadstring(s))("Cuniel_plus",ns) end')(
+loader=lua.eval('function(s,ns) assert(loadstring(s))("Cuniel_plus",ns) end')
+loader(Path('Cuniel_plus/Modules/ItemCountFilters.lua').read_text(encoding='utf-8'),lua.globals().NS)
+loader(
  Path('Cuniel_plus/Modules/ItemCounts.lua').read_text(encoding='utf-8'),lua.globals().NS)
 lua.execute('''
 local m=NS.modules.itemCounts;m:Initialize();m:Apply()
@@ -58,6 +60,12 @@ combat=true;bags[6][1]=nil;m:Scan();rows,_,total=m:Rows(100);assert(total==25,'c
 combat=false;m:Scan();rows,_,total=m:Rows(100);assert(total==21)
 m:ImportBrother();rows,_,total=m:Rows(100)
 assert(total==21,'old import overwrote newer snapshot')
+NS.db.itemCounts.filters.equipped=true
+local _,_,withoutEquipped=m:Rows(100)
+assert(withoutEquipped==19,'equipped filter did not exclude equipment from every character')
+NS.db.itemCounts.filters.equipped=false
+local _,_,restored=m:Rows(100)
+assert(restored==21,'equipped filter destroyed cached quantities')
 NS.db.itemCounts.enabled=false;GameTooltip.hooks.OnTooltipCleared(GameTooltip);m:Tooltip(GameTooltip,{id=100})
 assert(#GameTooltip.lines==count,'disabled module rendered')
 ''')

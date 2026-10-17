@@ -30,6 +30,7 @@ jobs:
           python tests/test_itemlevel_repair.py
           python tests/test_itemlevel_display.py
           python tests/test_itemcounts.py
+          python tests/test_itemcount_filters.py
       - name: Read addon version
         id: version
         run: |
