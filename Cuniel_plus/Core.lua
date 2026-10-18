@@ -11,6 +11,7 @@ NS.defaults = {
     deposit = {keepFood = true, keepIDs = {}},
     quiet = {enabled = true},
     arenaSpam = {enabled = true},
+    chatTabs = {enabled = true},
     bagPosition = {enabled = true, x = -55, y = 40},
     slotLabels = {enabled = true, size = 11, qualities = {
         [0] = false, [1] = false, [2] = false, [3] = true, [4] = true,
@@ -60,6 +61,8 @@ events:SetScript("OnEvent", function(_, _, name)
     end
     CunielPlusDB.version = 8
     NS.db = CunielPlusDB
+    CunielPlusCharDB = type(CunielPlusCharDB) == "table" and CunielPlusCharDB or {}
+    NS.charDB = CunielPlusCharDB
     if not ({east = true, west = true, original = true})[NS.db.numbers.mode] then
         NS.db.numbers.mode = "east"
     end
