@@ -30,6 +30,8 @@ jobs:
         run: |
           python tests/test_windows.py
           python tests/test_chattabs.py
+          python tests/test_details_layout.py
+          python tests/test_options.py
           python tests/test_slotlabels.py
           python tests/test_itemlevel_repair.py
           python tests/test_itemlevel_display.py

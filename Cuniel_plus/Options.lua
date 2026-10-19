@@ -1,169 +1,158 @@
 local _, NS = ...
-
 function NS:CreateOptions()
     local panel = CreateFrame("Frame", "CunielPlusOptions", UIParent, "BasicFrameTemplateWithInset")
     self.options = panel
-    panel:Hide()
-    panel:SetSize(590, 935)
-    panel:SetPoint("CENTER")
-    panel:SetFrameStrata("DIALOG")
-    panel:SetClampedToScreen(true)
-    panel:SetMovable(true)
-    panel:EnableMouse(true)
-    panel:RegisterForDrag("LeftButton")
-    panel:SetScript("OnDragStart", panel.StartMoving)
-    panel:SetScript("OnDragStop", panel.StopMovingOrSizing)
-    panel.TitleText:SetText("Cuniel_plus  |  0.3.17")
+    panel:Hide(); panel:SetSize(820, 590); panel:SetPoint("CENTER")
+    panel:SetFrameStrata("DIALOG"); panel:SetClampedToScreen(true)
+    panel:SetMovable(true); panel:EnableMouse(true); panel:RegisterForDrag("LeftButton")
+    panel:SetScript("OnDragStart", panel.StartMoving); panel:SetScript("OnDragStop", panel.StopMovingOrSizing)
+    local version = C_AddOns and C_AddOns.GetAddOnMetadata("Cuniel_plus", "Version") or "0.3.18"
+    panel.TitleText:SetText("Cuniel_plus  |  " .. version)
     tinsert(UISpecialFrames, "CunielPlusOptions")
-
-    local function Label(text, x, y, template)
-        local label = panel:CreateFontString(nil, "OVERLAY", template or "GameFontHighlight")
-        label:SetPoint("TOPLEFT", x, y)
-        label:SetText(text)
-        label:SetJustifyH("LEFT")
+    local skin = type(ShestakUI) == "table" and ShestakUI[1]
+    if skin and panel.StripTextures and panel.SetTemplate then panel:StripTextures(); panel:SetTemplate("Transparent") end
+    local refreshers, pages, nav, subnav = {}, {}, {}, {}
+    panel.pages, panel.navigation = pages, nav
+    local function OnRefresh(fn) refreshers[#refreshers + 1] = fn end
+    local function Label(parent, text, x, y, width, heading)
+        local label = parent:CreateFontString(nil, "OVERLAY", heading and "GameFontNormalLarge" or "GameFontHighlight")
+        label:SetPoint("TOPLEFT", x, y); label:SetWidth(width or 540); label:SetJustifyH("LEFT"); label:SetText(text)
         return label
     end
-    local function Button(text, x, y, width, callback)
-        local button = CreateFrame("Button", nil, panel, "UIPanelButtonTemplate")
-        button:SetPoint("TOPLEFT", x, y)
-        button:SetSize(width, 28)
-        button:SetText(text)
-        button:SetScript("OnClick", callback)
-        return button
+    local function Button(parent, text, x, y, width, action)
+        local b = CreateFrame("Button", nil, parent, "UIPanelButtonTemplate")
+        b:SetPoint("TOPLEFT", x, y); b:SetSize(width, 28); b:SetText(text)
+        b:SetScript("OnClick", function() action(); panel:Refresh() end)
+        if skin and b.SkinButton then b:SkinButton() end
+        return b
     end
-    Label("数字显示 · ShestakUI", 24, -48, "GameFontNormalLarge")
-    Label("切换四位进位（万 / 亿）或三位进位（K / M / B）。", 24, -77)
-    local modeButtons = {}
-    for i, item in ipairs({{"east", "万 / 亿"}, {"west", "K / M / B"}, {"original", "跟随 ShestakUI"}}) do
-        local mode = item[1]
-        modeButtons[mode] = Button(item[2], 24 + (i - 1) * 180, -101, 168, function()
-            NS.db.numbers.mode = mode
-            NS.modules.numbers:Apply()
-            panel:Refresh()
-        end)
+    local scroll = CreateFrame("ScrollFrame", "CunielPlusOptionsScroll", panel, "UIPanelScrollFrameTemplate")
+    scroll:SetPoint("TOPLEFT", 202, -87); scroll:SetPoint("BOTTOMRIGHT", -32, 47)
+    local content = CreateFrame("Frame", nil, scroll); content:SetSize(572, 435); scroll:SetScrollChild(content)
+    local heading = Label(panel, "总览", 204, -48, 540, true)
+    Label(panel, "ShestakUI 增强", 20, -519, 170)
+    Label(panel, "设置自动保存 · 部分功能需重新悬停或重载", 202, -554, 565)
+    local function Page(key, title, height)
+        local f = CreateFrame("Frame", nil, content); f:SetPoint("TOPLEFT"); f:SetSize(572, height or 435); f:Hide()
+        pages[key] = {frame = f, title = title, height = height or 435}; return f
     end
-    local status = Label("", 24, -143)
-    status:SetWidth(538)
-    status:SetHeight(40)
-    local preview = Label("", 24, -184)
-    Label("帧数显示", 24, -222, "GameFontNormalLarge")
-    local function Check(text, x, y, key)
-        local check = CreateFrame("CheckButton", nil, panel, "UICheckButtonTemplate")
-        check:SetPoint("TOPLEFT", x, y)
-        local caption = check:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-        caption:SetPoint("LEFT", check, "RIGHT", 2, 0)
-        caption:SetText(text)
-        check:SetScript("OnClick", function(self)
-            NS.db.fps[key] = self:GetChecked() and true or false
-            NS.modules.fps:Apply()
-        end)
-        return check
+    function panel:SelectPage(key)
+        if not pages[key] then return end
+        self.selectedPage = key
+        for name, p in pairs(pages) do p.frame:SetShown(name == key) end
+        heading:SetText(pages[key].title); content:SetHeight(pages[key].height); scroll:SetVerticalScroll(0); self:Refresh()
     end
-    local enabled = Check("显示 FPS", 20, -250, "enabled")
-    local locked = Check("锁定位置（鼠标穿透）", 230, -250, "locked")
-    Label("字号", 24, -303)
-    local sizeLabel = Label("", 146, -303)
-    local function ChangeSize(delta)
-        NS.db.fps.size = math.max(10, math.min(48, NS.db.fps.size + delta))
-        NS.modules.fps:Apply()
-        panel:Refresh()
+    for i, item in ipairs({{"overview", "总览"}, {"bags", "背包与银行"}, {"tooltip", "物品提示"}, {"numbers", "文字与显示"}, {"compat", "兼容与诊断"}}) do
+        local key = item[1]
+        nav[key] = Button(panel, item[2], 16, -57 - (i - 1) * 51, 166, function() panel:SelectPage(key) end)
     end
-    Button("−", 91, -295, 36, function() ChangeSize(-1) end)
-    Button("+", 180, -295, 36, function() ChangeSize(1) end)
-    Button("重置 FPS 位置", 300, -295, 240, function()
-        NS.db.fps.x, NS.db.fps.y = 0, 180
-        NS.modules.fps:Apply()
-    end)
-    Label("解锁后：左键拖动 FPS，右键打开设置。位置自动保存。", 24, -341)
-    Label("所有角色共用设置。输入 /cuniel 或 /cplus 打开此窗口。", 24, -367)
-    Label("ShestakUI 提示增强", 24, -405, "GameFontNormalLarge")
-    local function ModuleCheck(text, y, key)
-        local check = CreateFrame("CheckButton", nil, panel, "UICheckButtonTemplate")
-        check:SetPoint("TOPLEFT", 20, y)
-        local caption = check:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-        caption:SetPoint("LEFT", check, "RIGHT", 2, 0)
-        caption:SetText(text)
-        check:SetScript("OnClick", function(self)
-            NS.db[key].enabled = self:GetChecked() and true or false
-            NS.modules[key]:Apply()
-        end)
-        return check
+    local function Section(parent, text, y) Label(parent, text, 0, y, 550, true) end
+    local function Check(parent, text, y, get, set)
+        local c = CreateFrame("CheckButton", nil, parent, "UICheckButtonTemplate"); c:SetPoint("TOPLEFT", -4, y)
+        local label = c:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+        label:SetPoint("LEFT", c, "RIGHT", 2, 0); label:SetWidth(515); label:SetJustifyH("LEFT"); label:SetText(text)
+        c:SetScript("OnClick", function(button) set(button:GetChecked() and true or false); panel:Refresh() end)
+        if skin and skin.SkinCheckBox then skin.SkinCheckBox(c) end
+        OnRefresh(function() c:SetChecked(get()) end); return c
     end
-    local gold = ModuleCheck("金币统计角色名使用职业颜色", -435, "gold")
-    local itemLevel = ModuleCheck("鼠标提示装等（ShestakUI 已开启时自动让位）", -470, "itemLevel")
-    local bags = ModuleCheck("Bagnon 独立工具条：售卖 / 整理 / 存战团银行", -505, "bags")
-    local autoSell = CreateFrame("CheckButton", nil, panel, "UICheckButtonTemplate")
-    autoSell:SetPoint("TOPLEFT", 20, -540)
-    local saleCaption = autoSell:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
-    saleCaption:SetPoint("LEFT", autoSell, "RIGHT", 2, 0)
-    saleCaption:SetText("自动出售垃圾（当前角色 · ShestakUI）")
-    autoSell:SetScript("OnClick", function(self)
-        NS.modules.bags:SetAutoSell(self:GetChecked())
-        panel:Refresh()
-    end)
-    local quiet = ModuleCheck("登录静默：屏蔽已识别插件的加载 / 宣传提示", -575, "quiet")
-    local arenaSpam = ModuleCheck("竞技场：隐藏重复的“玩家加入战斗”系统消息", -610, "arenaSpam")
-    local bagPosition = ModuleCheck("ShestakUI 背包避让：向左并向上移动", -645, "bagPosition")
-    local slotLabels = ModuleCheck("ShestakUI 背包：显示装备部位文字", -680, "slotLabels")
-    Button("品质", 283, -681, 54, function() NS.modules.slotLabels:OpenQualityOptions() end)
-    Label("部位字号", 345, -689)
-    local slotSizeLabel = Label("", 473, -689)
-    local function ChangeSlotSize(delta)
-        NS.db.slotLabels.size = math.max(8, math.min(24, NS.db.slotLabels.size + delta))
-        NS.modules.slotLabels:Apply()
-        panel:Refresh()
+    local function ModuleCheck(parent, text, y, key)
+        return Check(parent, text, y, function() return NS.db[key].enabled end, function(v) NS.db[key].enabled = v; NS.modules[key]:Apply() end)
     end
-    Button("−", 420, -681, 36, function() ChangeSlotSize(-1) end)
-    Button("+", 505, -681, 36, function() ChangeSlotSize(1) end)
-    local mapEscape = ModuleCheck("ESC 兼容：地图、角色、天赋、专业等常用窗口", -715, "mapEscape")
-    Button("战团存放：食物保护 / 排除物品 ID", 24, -755, 360, function() NS.Deposit:OpenOptions() end)
-    Button("修复装等重复：切换 Cuniel_plus 并重载", 24, -795, 430, function() NS.modules.itemLevel:RepairShestak() end)
-    local itemCounts = ModuleCheck("背包物品统计：职业色角色数量 / 战团银行（缓存）", -830, "itemCounts")
-    Button("物品统计：过滤规则 / 排除物品 ID", 24, -870, 360, function() NS.ItemCountFilters:OpenOptions() end)
-    Button("聊天标签页", 395, -870, 165, function() NS.modules.chatTabs:OpenOptions() end)
-    function panel:Refresh()
-        for mode, button in pairs(modeButtons) do
-            button:SetEnabled(mode ~= NS.db.numbers.mode)
+    local function Stepper(parent, text, y, get, set, low, high)
+        Label(parent, text, 0, y - 6, 190); local value = Label(parent, "", 260, y - 6, 45)
+        Button(parent, "−", 208, y, 38, function() set(math.max(low, get() - 1)) end)
+        Button(parent, "+", 306, y, 38, function() set(math.min(high, get() + 1)) end)
+        OnRefresh(function() value:SetText(tostring(get())) end)
+    end
+    local function DisplayTabs(parent)
+        for i, item in ipairs({{"numbers", "数字格式"}, {"fps", "帧数显示"}, {"slots", "装备部位"}}) do
+            local key = item[1]
+            local b = Button(parent, item[2], (i - 1) * 181, 0, 168, function() panel:SelectPage(key) end)
+            subnav[#subnav + 1] = {button = b, key = key}
         end
-        status:SetText(NS.modules.numbers.status or "等待初始化")
-        local mode = NS.db.numbers.mode
-        preview:SetText(mode == "east" and "示例：1.23万    1234万    1.23亿"
-            or mode == "west" and "示例：12.3K    12.3M    123M"
-            or "跟随模式不会撤销 ShestakUI 文件中已存在的补丁。")
-        enabled:SetChecked(NS.db.fps.enabled)
-        locked:SetChecked(NS.db.fps.locked)
-        sizeLabel:SetText(tostring(NS.db.fps.size))
-        gold:SetChecked(NS.db.gold.enabled)
-        itemLevel:SetChecked(NS.db.itemLevel.enabled)
-        bags:SetChecked(NS.db.bags.enabled)
-        local selling, available = NS.modules.bags:GetAutoSell()
-        autoSell:SetChecked(selling)
-        autoSell:SetEnabled(available)
-        quiet:SetChecked(NS.db.quiet.enabled)
-        arenaSpam:SetChecked(NS.db.arenaSpam.enabled)
-        bagPosition:SetChecked(NS.db.bagPosition.enabled)
-        slotLabels:SetChecked(NS.db.slotLabels.enabled)
-        slotSizeLabel:SetText(tostring(NS.db.slotLabels.size))
-        mapEscape:SetChecked(NS.db.mapEscape.enabled)
-        itemCounts:SetChecked(NS.db.itemCounts.enabled)
     end
-    panel:SetScript("OnShow", panel.Refresh)
-
-    -- Also provide an entry in Blizzard's Settings > AddOns, when available.
+    local overview = Page("overview", "总览")
+    Section(overview, "常用设置，按功能分类", 0)
+    Label(overview, "现有配置与角色缓存保留。左侧选择分类，无需翻找整个长窗口。", 0, -39)
+    Section(overview, "当前版本", -92)
+    Label(overview, "Cuniel_plus " .. version .. "\n开发客户端：国服正式服 12.1.5.70448\n\nWindows / Mac 共用功能；Details 按当前窗口空间判断。\n本版不调整 Mac 字体。", 0, -127)
+    Button(overview, "装备部位：字号与品质", 0, -251, 265, function() panel:SelectPage("slots") end)
+    Button(overview, "Details 自动避让", 281, -251, 265, function() panel:SelectPage("compat") end)
+    Button(overview, "中文聊天标签页", 0, -295, 265, function() NS.modules.chatTabs:OpenOptions() end)
+    local bags = Page("bags", "背包与银行")
+    Section(bags, "背包布局", 0); ModuleCheck(bags, "背包避让：向左并向上移动", -35, "bagPosition")
+    Section(bags, "整理与售卖", -91); ModuleCheck(bags, "Bagnon 工具条：售卖 / 整理 / 存战团银行", -125, "bags")
+    local autoSell = Check(bags, "自动出售垃圾（当前角色 · ShestakUI）", -164, function() return NS.modules.bags:GetAutoSell() end, function(v) NS.modules.bags:SetAutoSell(v) end)
+    OnRefresh(function() local _, available = NS.modules.bags:GetAutoSell(); autoSell:SetEnabled(available) end)
+    Label(bags, "整理沿用 ShestakUI 原有顺序，不另设炉石优先级。", 0, -210)
+    Section(bags, "战团存放保护", -265)
+    Button(bags, "食物保护 / 不存入的物品 ID", 0, -302, 430, function() NS.Deposit:OpenOptions() end)
+    Label(bags, "存放排除名单与物品数量的隐藏名单相互独立。", 0, -347)
+    local tooltip = Page("tooltip", "物品提示")
+    Section(tooltip, "角色物品数量", 0); ModuleCheck(tooltip, "显示职业色角色数量 / 战团银行（缓存）", -35, "itemCounts")
+    Button(tooltip, "物品统计：过滤规则 / 隐藏物品 ID", 0, -83, 430, function() NS.ItemCountFilters:OpenOptions() end)
+    Label(tooltip, "离线数量来自缓存；未读取角色或银行不代表数量为零。", 0, -125)
+    Section(tooltip, "装等与角色名", -188)
+    ModuleCheck(tooltip, "鼠标提示装等（ShestakUI 已开启时自动让位）", -222, "itemLevel")
+    ModuleCheck(tooltip, "金币统计角色名使用职业颜色", -261, "gold")
+    Button(tooltip, "修复装等重复：切换 Cuniel_plus 并重载", 0, -316, 480, function() NS.modules.itemLevel:RepairShestak() end)
+    local numbers = Page("numbers", "文字与显示 · 数字格式"); DisplayTabs(numbers)
+    Section(numbers, "ShestakUI 数字单位", -66)
+    local modes = {}
+    for i, item in ipairs({{"east", "万 / 亿"}, {"west", "K / M / B"}, {"original", "跟随 ShestakUI"}}) do
+        local key = item[1]
+        modes[key] = Button(numbers, item[2], (i - 1) * 181, -105, 168, function() NS.db.numbers.mode = key; NS.modules.numbers:Apply() end)
+    end
+    local numberStatus = Label(numbers, "", 0, -157); local numberPreview = Label(numbers, "", 0, -216)
+    Label(numbers, "目前覆盖公共数字函数；经验、声望等独立模块的统一及完整数值模式仍在规划中。\n\n“跟随 ShestakUI”不等于“完整数值”。", 0, -284)
+    OnRefresh(function()
+        for key, b in pairs(modes) do b:SetEnabled(NS.db.numbers.mode ~= key) end
+        numberStatus:SetText(NS.modules.numbers.status or "等待初始化")
+        local mode = NS.db.numbers.mode
+        numberPreview:SetText(mode == "east" and "示例：1.23万    1234万    1.23亿" or mode == "west" and "示例：12.3K    12.3M    123M" or "保留 ShestakUI 当前的数字格式。")
+    end)
+    local fps = Page("fps", "文字与显示 · 帧数显示"); DisplayTabs(fps)
+    ModuleCheck(fps, "显示 FPS", -70, "fps")
+    Check(fps, "锁定位置（鼠标穿透）", -112, function() return NS.db.fps.locked end, function(v) NS.db.fps.locked = v; NS.modules.fps:Apply() end)
+    Stepper(fps, "帧数字号", -178, function() return NS.db.fps.size end, function(v) NS.db.fps.size = v; NS.modules.fps:Apply() end, 10, 48)
+    Button(fps, "重置 FPS 位置", 0, -238, 300, function() NS.db.fps.x, NS.db.fps.y = 0, 180; NS.modules.fps:Apply() end)
+    Label(fps, "解锁后左键拖动 FPS，右键打开设置；位置自动保存。", 0, -292)
+    local slots = Page("slots", "文字与显示 · 装备部位", 665); DisplayTabs(slots)
+    ModuleCheck(slots, "在背包装备格中显示部位文字", -65, "slotLabels")
+    Stepper(slots, "部位字号", -121, function() return NS.db.slotLabels.size end, function(v) NS.db.slotLabels.size = v; NS.modules.slotLabels:Apply() end, 8, 24)
+    Section(slots, "显示品质", -180)
+    local qualities = {{"粗糙 · 灰色", "9d9d9d"}, {"普通 · 白色", "ffffff"}, {"优秀 · 绿色", "1eff00"}, {"精良 · 蓝色", "0070dd"}, {"史诗 · 紫色", "a335ee"}, {"传说 · 橙色", "ff8000"}, {"神器 · 金色", "e6cc80"}, {"传家宝 · 浅蓝色", "00ccff"}, {"时光徽章 · 特殊品质", "00ccff"}}
+    for i, item in ipairs(qualities) do
+        local quality = i - 1
+        Check(slots, "|cff" .. item[2] .. item[1] .. "|r", -215 - (i - 1) * 34, function() return NS.db.slotLabels.qualities[quality] end, function(v) NS.db.slotLabels.qualities[quality] = v; NS.modules.slotLabels:Apply() end)
+    end
+    Label(slots, "默认灰/白/绿关闭，蓝色及以上开启。仅可穿戴装备显示部位。", 0, -540)
+    local slotPreview = Label(slots, "脚部     手指     胸部（文字预览）", 0, -584)
+    OnRefresh(function() local font, _, flags = slotPreview:GetFont(); slotPreview:SetFont(font, NS.db.slotLabels.size, flags) end)
+    local compat = Page("compat", "兼容与诊断", 560)
+    Section(compat, "Details 窗口避让", 0); ModuleCheck(compat, "自动处理伤害 / 治疗窗口重叠或越界", -34, "detailsLayout")
+    Label(compat, "按当前 UI 可用空间判断；能并排则并排，空间不足尝试上下排列。\n保留正常位置，不缩小字体；战斗中等待脱战。", 0, -77)
+    Button(compat, "立即检查并重新排列", 0, -136, 300, function() NS.modules.detailsLayout:Apply(true) end)
+    local layoutStatus = Label(compat, "", 0, -179)
+    OnRefresh(function() layoutStatus:SetText(NS.modules.detailsLayout.status or "等待登录后检查。") end)
+    Section(compat, "常用窗口与消息", -245)
+    ModuleCheck(compat, "ESC 兼容：地图、角色、天赋、专业等窗口", -280, "mapEscape")
+    ModuleCheck(compat, "登录静默：已识别插件的加载 / 宣传提示", -319, "quiet")
+    ModuleCheck(compat, "竞技场：隐藏重复的玩家加入战斗消息", -358, "arenaSpam")
+    Button(compat, "中文聊天标签页", 0, -413, 260, function() NS.modules.chatTabs:OpenOptions() end)
+    Label(compat, "窗口诊断：/cplusesc    操作拦截诊断：/cplusdiag\nESC 兼容不能绕过游戏战斗保护。", 0, -464)
+    function panel:Refresh()
+        for _, fn in ipairs(refreshers) do fn() end
+        for key, b in pairs(nav) do b:SetEnabled(not (key == self.selectedPage or key == "numbers" and (self.selectedPage == "fps" or self.selectedPage == "slots"))) end
+        for _, item in ipairs(subnav) do item.button:SetEnabled(item.key ~= self.selectedPage) end
+    end
+    local function Fit() panel:SetScale(math.min(1, (UIParent:GetWidth() - 32) / 820, (UIParent:GetHeight() - 32) / 590)) end
+    panel:SetScript("OnShow", function() Fit(); panel:Refresh() end)
+    panel:RegisterEvent("DISPLAY_SIZE_CHANGED"); panel:RegisterEvent("UI_SCALE_CHANGED"); panel:SetScript("OnEvent", Fit)
+    panel:SelectPage("overview")
     if Settings and Settings.RegisterCanvasLayoutCategory and Settings.RegisterAddOnCategory then
-        local launcher = CreateFrame("Frame")
-        local title = launcher:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
-        title:SetPoint("TOPLEFT", 20, -20)
-        title:SetText("Cuniel_plus")
-        local open = CreateFrame("Button", nil, launcher, "UIPanelButtonTemplate")
-        open:SetPoint("TOPLEFT", 20, -60)
-        open:SetSize(200, 30)
-        open:SetText("打开功能设置")
-        open:SetScript("OnClick", function()
-            if SettingsPanel then SettingsPanel:Hide() end
-            panel:Show()
-        end)
-        local category = Settings.RegisterCanvasLayoutCategory(launcher, "Cuniel_plus")
-        Settings.RegisterAddOnCategory(category)
+        local launcher = CreateFrame("Frame"); Label(launcher, "Cuniel_plus", 20, -20, 500, true)
+        Button(launcher, "打开功能设置", 20, -60, 200, function() if SettingsPanel then SettingsPanel:Hide() end; panel:Show() end)
+        local category = Settings.RegisterCanvasLayoutCategory(launcher, "Cuniel_plus"); Settings.RegisterAddOnCategory(category)
     end
 end
