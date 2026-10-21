@@ -3,7 +3,7 @@
 ## Notes: Modular UI enhancements: ShestakUI numbers and movable FPS.
 ## Notes-zhCN: 模块化界面增强：数字格式切换、可移动帧数显示。
 ## Author: Cuniel
-## Version: 0.3.18
+## Version: 0.3.21
 ## X-Client-Version: Retail CN 12.1.5.70448
 ## OptionalDeps: ShestakUI, BagBrother, Bagnon, Details
 ## SavedVariables: CunielPlusDB
@@ -26,4 +26,5 @@ Modules\Quiet.lua
 Modules\ArenaSpam.lua
 Modules\ChatTabs.lua
 Modules\DetailsLayout.lua
+Modules\Readability.lua
 Options.lua

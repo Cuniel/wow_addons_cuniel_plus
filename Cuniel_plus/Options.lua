@@ -6,7 +6,7 @@ function NS:CreateOptions()
     panel:SetFrameStrata("DIALOG"); panel:SetClampedToScreen(true)
     panel:SetMovable(true); panel:EnableMouse(true); panel:RegisterForDrag("LeftButton")
     panel:SetScript("OnDragStart", panel.StartMoving); panel:SetScript("OnDragStop", panel.StopMovingOrSizing)
-    local version = C_AddOns and C_AddOns.GetAddOnMetadata("Cuniel_plus", "Version") or "0.3.18"
+    local version = C_AddOns and C_AddOns.GetAddOnMetadata("Cuniel_plus", "Version") or "0.3.21"
     panel.TitleText:SetText("Cuniel_plus  |  " .. version)
     tinsert(UISpecialFrames, "CunielPlusOptions")
     local skin = type(ShestakUI) == "table" and ShestakUI[1]
@@ -65,9 +65,9 @@ function NS:CreateOptions()
         OnRefresh(function() value:SetText(tostring(get())) end)
     end
     local function DisplayTabs(parent)
-        for i, item in ipairs({{"numbers", "数字格式"}, {"fps", "帧数显示"}, {"slots", "装备部位"}}) do
+        for i, item in ipairs({{"numbers", "数字格式"}, {"fps", "帧数显示"}, {"slots", "装备部位"}, {"fonts", "字体可读性"}}) do
             local key = item[1]
-            local b = Button(parent, item[2], (i - 1) * 181, 0, 168, function() panel:SelectPage(key) end)
+            local b = Button(parent, item[2], (i - 1) * 140, 0, 132, function() panel:SelectPage(key) end)
             subnav[#subnav + 1] = {button = b, key = key}
         end
     end
@@ -75,7 +75,7 @@ function NS:CreateOptions()
     Section(overview, "常用设置，按功能分类", 0)
     Label(overview, "现有配置与角色缓存保留。左侧选择分类，无需翻找整个长窗口。", 0, -39)
     Section(overview, "当前版本", -92)
-    Label(overview, "Cuniel_plus " .. version .. "\n开发客户端：国服正式服 12.1.5.70448\n\nWindows / Mac 共用功能；Details 按当前窗口空间判断。\n本版不调整 Mac 字体。", 0, -127)
+    Label(overview, "Cuniel_plus " .. version .. "\n开发客户端：国服正式服 12.1.5.70448\n\nDetails 限制在目标框下方，宽则并排、窄则堆叠。\nMac 高分辨率小字补偿可在文字与显示中调整。", 0, -127)
     Button(overview, "装备部位：字号与品质", 0, -251, 265, function() panel:SelectPage("slots") end)
     Button(overview, "Details 自动避让", 281, -251, 265, function() panel:SelectPage("compat") end)
     Button(overview, "中文聊天标签页", 0, -295, 265, function() NS.modules.chatTabs:OpenOptions() end)
@@ -129,9 +129,21 @@ function NS:CreateOptions()
     Label(slots, "默认灰/白/绿关闭，蓝色及以上开启。仅可穿戴装备显示部位。", 0, -540)
     local slotPreview = Label(slots, "脚部     手指     胸部（文字预览）", 0, -584)
     OnRefresh(function() local font, _, flags = slotPreview:GetFont(); slotPreview:SetFont(font, NS.db.slotLabels.size, flags) end)
+    local fonts = Page("fonts", "文字与显示 · 字体可读性"); DisplayTabs(fonts)
+    ModuleCheck(fonts, "补偿高分辨率下偏小的单位文字与聊天标签", -65, "readability")
+    Check(fonts, "仅在 Mac 自动启用（Windows 默认保持原样）", -109,
+        function() return NS.db.readability.macOnly end,
+        function(v) NS.db.readability.macOnly = v; NS.modules.readability:Apply() end)
+    Stepper(fonts, "最低字号", -166, function() return NS.db.readability.size end,
+        function(v) NS.db.readability.size = v; NS.modules.readability:Apply() end, 10, 20)
+    Label(fonts, "仅在 ShestakUI mult 小于 0.85 时补足小字；保留较大字号、字体与描边。\n不改全局 UI 缩放；FPS、装备部位和 Details 字号各自设置。\n战斗中延后；关闭恢复当前会话内原字号。", 0, -224)
+    local fontStatus = Label(fonts, "", 0, -320)
+    OnRefresh(function() fontStatus:SetText(NS.modules.readability.status or "等待检查字体。") end)
+    Stepper(fonts, "公会 / 密语 / 团队标签字号", -377, function() return NS.db.chatTabs.labelSize or 14 end,
+        function(v) NS.db.chatTabs.labelSize = v; NS.modules.chatTabs:Apply() end, 10, 20)
     local compat = Page("compat", "兼容与诊断", 560)
     Section(compat, "Details 窗口避让", 0); ModuleCheck(compat, "自动处理伤害 / 治疗窗口重叠或越界", -34, "detailsLayout")
-    Label(compat, "按当前 UI 可用空间判断；能并排则并排，空间不足尝试上下排列。\n保留正常位置，不缩小字体；战斗中等待脱战。", 0, -77)
+    Label(compat, "目标框下方至底部线，左避技能栏，右留双列小图标。\n治疗靠右、伤害紧邻；窄则等宽堆叠右对齐（60% / 40%），不缩字号。", 0, -77)
     Button(compat, "立即检查并重新排列", 0, -136, 300, function() NS.modules.detailsLayout:Apply(true) end)
     local layoutStatus = Label(compat, "", 0, -179)
     OnRefresh(function() layoutStatus:SetText(NS.modules.detailsLayout.status or "等待登录后检查。") end)
@@ -143,7 +155,7 @@ function NS:CreateOptions()
     Label(compat, "窗口诊断：/cplusesc    操作拦截诊断：/cplusdiag\nESC 兼容不能绕过游戏战斗保护。", 0, -464)
     function panel:Refresh()
         for _, fn in ipairs(refreshers) do fn() end
-        for key, b in pairs(nav) do b:SetEnabled(not (key == self.selectedPage or key == "numbers" and (self.selectedPage == "fps" or self.selectedPage == "slots"))) end
+        for key, b in pairs(nav) do b:SetEnabled(not (key == self.selectedPage or key == "numbers" and (self.selectedPage == "fps" or self.selectedPage == "slots" or self.selectedPage == "fonts"))) end
         for _, item in ipairs(subnav) do item.button:SetEnabled(item.key ~= self.selectedPage) end
     end
     local function Fit() panel:SetScale(math.min(1, (UIParent:GetWidth() - 32) / 820, (UIParent:GetHeight() - 32) / 590)) end

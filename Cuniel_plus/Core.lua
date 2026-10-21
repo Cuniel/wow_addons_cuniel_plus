@@ -11,8 +11,9 @@ NS.defaults = {
     deposit = {keepFood = true, keepIDs = {}},
     quiet = {enabled = true},
     arenaSpam = {enabled = true},
-    chatTabs = {enabled = true},
+    chatTabs = {enabled = true, labelSize = 14},
     detailsLayout = {enabled = true},
+    readability = {enabled = true, macOnly = true, size = 12},
     bagPosition = {enabled = true, x = -55, y = 40},
     slotLabels = {enabled = true, size = 11, qualities = {
         [0] = false, [1] = false, [2] = false, [3] = true, [4] = true,

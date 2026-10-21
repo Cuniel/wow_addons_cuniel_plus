@@ -1,5 +1,5 @@
 local _, NS = ...
-local Module = {}
+local Module = {labels = setmetatable({}, {__mode = "k"}), labelHooks = setmetatable({}, {__mode = "k"})}
 NS:RegisterModule("chatTabs", Module)
 
 -- Ciaoasher's categories, with Chinese tab names. Do not clone server channels,
@@ -49,6 +49,66 @@ local function Ready()
         if type(_G[name]) ~= "function" then return false end
     end
     return ChatFrame1 and type(ChatFrame1.RemoveAllMessageGroups) == "function"
+end
+
+function Module:IsManagedLabel(fs)
+    local state = State()
+    local record = self.labels[fs]
+    if not record or not NS.db.chatTabs.enabled or state.disabled or state.version ~= 1
+        or type(GetChatWindowInfo) ~= "function" then return false end
+    local frame = record.owner
+    if frame.isTemporary or (frame.IsForbidden and frame:IsForbidden()) then return false end
+    local name = GetChatWindowInfo(frame:GetID())
+    return name == "公会" or name == "密语" or name == "团队"
+end
+
+function Module:LabelFont(fs, owner)
+    if self.labelRunning or not fs or not fs.GetFont or not fs.SetFont then return end
+    if fs.IsForbidden and fs:IsForbidden() then return end
+    if InCombatLockdown() then self.labelPending = true; return end
+    local font, size, flags = fs:GetFont()
+    if not font or type(size) ~= "number" then return end
+    local record = self.labels[fs]
+    if not record or font ~= record.font or size ~= record.applied or flags ~= record.flags then
+        record = {font = font, size = size, flags = flags, owner = owner}; self.labels[fs] = record
+    end
+    local desired = math.max(10, math.min(20, tonumber(NS.db.chatTabs.labelSize) or 14))
+    record.applied = desired
+    if size ~= desired then
+        self.labelRunning = true; fs:SetFont(font, desired, flags); self.labelRunning = nil
+    end
+    if not self.labelHooks[fs] and hooksecurefunc then
+        self.labelHooks[fs] = true
+        hooksecurefunc(fs, "SetFont", function()
+            if not Module.labelRunning and Module:IsManagedLabel(fs) then Module:LabelFont(fs, record.owner) end
+        end)
+    end
+end
+
+function Module:ApplyLabels()
+    if InCombatLockdown() then self.labelPending = true; return end
+    self.labelPending = nil
+    local state, seen = State(), {}
+    if NS.db.chatTabs.enabled and not state.disabled and state.version == 1 and type(GetChatWindowInfo) == "function" then
+        for _, item in ipairs(CustomFrames()) do
+            if item.name == "公会" or item.name == "密语" or item.name == "团队" then
+                local tab = _G["ChatFrame" .. item.frame:GetID() .. "Tab"]
+                local fs = tab and (tab.GetFontString and tab:GetFontString() or tab.Text)
+                if fs then seen[fs] = true; self:LabelFont(fs, item.frame) end
+            end
+        end
+    end
+    for fs, record in pairs(self.labels) do
+        if not seen[fs] then
+            if not (fs.IsForbidden and fs:IsForbidden()) then
+                local font, size, flags = fs:GetFont()
+                if font == record.font and size == record.applied and flags == record.flags then
+                    self.labelRunning = true; fs:SetFont(record.font, record.size, record.flags); self.labelRunning = nil
+                end
+            end
+            self.labels[fs] = nil
+        end
+    end
 end
 
 function Module:Snapshot()
@@ -154,6 +214,7 @@ function Module:Configure(force)
         self.pending, self.failed = nil, nil
         self.status = "已配置公会、密语、团队；本角色后续登录不重复创建。"
     end)
+    if ok then self:ApplyLabels() end
     if ok and force then NS:Print(self.status) end
     return ok
 end
@@ -173,13 +234,14 @@ function Module:Restore()
         self.pending, self.failed = nil, nil
         self.status = "已恢复原标签，并停用当前角色的自动配置。备份不含聊天记录。"
     end, #state.backup)
-    if ok then NS:Print(self.status) end
+    if ok then self:ApplyLabels(); NS:Print(self.status) end
     return ok
 end
 
 function Module:Apply()
-    if not NS.db.chatTabs.enabled then self.pending = nil; return end
+    if not NS.db.chatTabs.enabled then self.pending = nil; self:ApplyLabels(); return end
     if self.loggedIn then self:Configure() end
+    self:ApplyLabels()
 end
 
 function Module:Initialize()
@@ -192,7 +254,7 @@ function Module:Initialize()
                 self.scheduled = true
                 C_Timer.After(1, function() self.scheduled = nil; self:Apply() end)
             end
-        elseif self.pending then self.pending = nil; self:Apply() end
+        elseif self.pending or self.labelPending then self.pending = nil; self:Apply() end
     end)
 end
 
